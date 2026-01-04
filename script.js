@@ -1,5 +1,6 @@
 // ========================================
 // Prompt Saver - Web Companion
+// v2.0 - Simplified Connection Method
 // ========================================
 
 // State
@@ -95,9 +96,45 @@ async function init() {
 
     setTheme(savedTheme);
     await setLocale(savedLocale);
+    
+    // Check for data in URL hash first
+    checkUrlForData();
+    
     generateQRCode();
     setupEventListeners();
-    startConnectionPolling();
+}
+
+function checkUrlForData() {
+    // Check if data is passed via URL hash
+    const hash = window.location.hash;
+    if (hash && hash.startsWith('#data=')) {
+        try {
+            const encodedData = hash.substring(6);
+            const jsonData = decodeURIComponent(atob(encodedData));
+            const data = JSON.parse(jsonData);
+            
+            if (data && data.prompts) {
+                handleConnection(data);
+                // Clear the hash after reading
+                history.replaceState(null, null, window.location.pathname);
+            }
+        } catch (e) {
+            console.error('Failed to parse URL data:', e);
+        }
+    }
+    
+    // Also check localStorage for cached session
+    const cachedData = localStorage.getItem('prompt_master_session');
+    if (cachedData && !state.connected) {
+        try {
+            const data = JSON.parse(cachedData);
+            if (data && data.prompts) {
+                handleConnection(data);
+            }
+        } catch (e) {
+            localStorage.removeItem('prompt_master_session');
+        }
+    }
 }
 
 function setupEventListeners() {
@@ -166,6 +203,9 @@ function setupEventListeners() {
             closeCategoryModal();
         }
     });
+    
+    // Listen for hash changes (when app sends data)
+    window.addEventListener('hashchange', checkUrlForData);
 }
 
 // ========================================
@@ -183,9 +223,14 @@ function generateSessionId() {
 
 function generateQRCode() {
     state.sessionId = generateSessionId();
+    
+    // Include the current page URL so the app knows where to redirect
+    const pageUrl = window.location.href.split('#')[0];
+    
     const qrData = JSON.stringify({
         type: 'prompt_master_web',
         sessionId: state.sessionId,
+        url: pageUrl,
         timestamp: Date.now()
     });
 
@@ -239,16 +284,6 @@ function updateConnectionStatus(status) {
 // Connection
 // ========================================
 
-function startConnectionPolling() {
-    state.pollingInterval = setInterval(() => {
-        const demoConnect = localStorage.getItem('demo_connect_' + state.sessionId);
-        if (demoConnect) {
-            localStorage.removeItem('demo_connect_' + state.sessionId);
-            handleConnection(JSON.parse(demoConnect));
-        }
-    }, 1000);
-}
-
 function handleConnection(data) {
     updateConnectionStatus('connecting');
 
@@ -257,17 +292,18 @@ function handleConnection(data) {
 
     setTimeout(() => {
         state.connected = true;
-        state.sessionStartTime = Date.now(); // Track session start time
+        state.sessionStartTime = Date.now();
 
         if (data && data.prompts) {
             state.prompts = data.prompts;
             state.categories = data.categories || [];
             state.tags = data.tags || [];
+            
+            // Cache the session data
+            localStorage.setItem('prompt_master_session', JSON.stringify(data));
         } else {
             loadDemoData();
         }
-
-        if (state.pollingInterval) clearInterval(state.pollingInterval);
 
         // Smooth transition
         elements.connectionScreen.classList.remove('active');
@@ -275,7 +311,7 @@ function handleConnection(data) {
         elements.mainScreen.classList.remove('hidden');
         elements.mainScreen.classList.add('active', 'fade-in');
 
-        // Start session duration timer (counting UP, not down)
+        // Start session duration timer
         startSessionDurationTimer();
         renderCategories();
         renderPrompts();
@@ -288,7 +324,18 @@ function handleConnection(data) {
     }, 800);
 }
 
-window.simulatePhoneScan = function () { handleConnection(null); };
+// Function for app to call - receives data and displays it
+window.receiveDataFromApp = function(data) {
+    if (data && data.prompts) {
+        handleConnection(data);
+    }
+};
+
+// Demo function for testing
+window.simulatePhoneScan = function() {
+    loadDemoData();
+    handleConnection({ prompts: state.prompts, categories: state.categories, tags: state.tags });
+};
 
 function loadDemoData() {
     state.categories = [
@@ -331,6 +378,9 @@ function disconnect() {
     state.sessionStartTime = null;
     state.prompts = [];
     state.categories = [];
+    
+    // Clear cached session
+    localStorage.removeItem('prompt_master_session');
 
     elements.mainScreen.classList.add('fade-out');
 
@@ -341,7 +391,6 @@ function disconnect() {
         elements.connectionScreen.classList.add('active', 'fade-in');
 
         generateQRCode();
-        startConnectionPolling();
 
         setTimeout(() => {
             elements.connectionScreen.classList.remove('fade-in');
@@ -775,7 +824,8 @@ function importPrompts(e) {
 // ========================================
 
 function syncToApp() {
-    localStorage.setItem('prompt_master_data', JSON.stringify({
+    // Update cached session
+    localStorage.setItem('prompt_master_session', JSON.stringify({
         prompts: state.prompts,
         categories: state.categories,
         tags: state.tags
@@ -800,19 +850,24 @@ function setTheme(theme) {
     const sunIcon = elements.themeToggle.querySelector('.sun-icon');
     const moonIcon = elements.themeToggle.querySelector('.moon-icon');
     if (theme === 'dark') {
-        sunIcon.classList.add('hidden');
-        moonIcon.classList.remove('hidden');
+        sunIcon?.classList.remove('hidden');
+        moonIcon?.classList.add('hidden');
     } else {
-        sunIcon.classList.remove('hidden');
-        moonIcon.classList.add('hidden');
+        sunIcon?.classList.add('hidden');
+        moonIcon?.classList.remove('hidden');
     }
-    if (!state.connected && elements.qrCodeContainer.children.length > 0) generateQRCode();
 }
 
-function toggleTheme() { setTheme(state.theme === 'light' ? 'dark' : 'light'); }
+function toggleTheme() {
+    setTheme(state.theme === 'light' ? 'dark' : 'light');
+    // Regenerate QR with new colors if not connected
+    if (!state.connected) {
+        generateQRCode();
+    }
+}
 
 function getBrowserLocale() {
-    const lang = navigator.language.split('-')[0];
+    const lang = navigator.language?.substring(0, 2) || 'en';
     return ['en', 'ar', 'fr', 'es'].includes(lang) ? lang : 'en';
 }
 
@@ -820,32 +875,32 @@ async function setLocale(locale) {
     state.locale = locale;
     localStorage.setItem('locale', locale);
     elements.languageSelect.value = locale;
-
-    if (locale === 'ar') {
-        document.documentElement.setAttribute('dir', 'rtl');
-        document.documentElement.setAttribute('lang', 'ar');
-    } else {
-        document.documentElement.setAttribute('dir', 'ltr');
-        document.documentElement.setAttribute('lang', locale);
-    }
+    document.documentElement.lang = locale;
+    document.documentElement.dir = locale === 'ar' ? 'rtl' : 'ltr';
 
     try {
         const response = await fetch(`i18n/${locale}.json`);
-        state.translations = await response.json();
-    } catch (err) {
-        state.translations = {};
+        if (response.ok) {
+            state.translations = await response.json();
+            applyTranslations();
+        }
+    } catch (e) {
+        console.error('Failed to load translations:', e);
     }
-    applyTranslations();
 }
 
 function applyTranslations() {
     document.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.getAttribute('data-i18n');
-        if (state.translations[key]) el.textContent = state.translations[key];
+        if (state.translations[key]) {
+            el.textContent = state.translations[key];
+        }
     });
     document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
         const key = el.getAttribute('data-i18n-placeholder');
-        if (state.translations[key]) el.placeholder = state.translations[key];
+        if (state.translations[key]) {
+            el.placeholder = state.translations[key];
+        }
     });
 }
 
@@ -859,9 +914,15 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-function formatDate(dateString) {
-    return new Date(dateString).toLocaleDateString(state.locale, { year: 'numeric', month: 'short', day: 'numeric' });
+function formatDate(dateStr) {
+    if (!dateStr) return '-';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString(state.locale, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+    });
 }
 
-// Initialize
+// Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', init);
