@@ -244,15 +244,26 @@ function initPeer() {
 
         conn.on('error', (err) => {
             console.error('Connection error:', err);
-            showToast('Connection error', 'error');
+            showToast('Connection error: ' + err, 'error');
+            updateConnectionStatus('error');
         });
     });
 
     state.peer.on('error', (err) => {
         console.error('Peer error:', err);
-        showToast('Connection server error. Retrying...', 'error');
+        showToast('Server error: ' + err.type, 'error');
+
+        // Show error in QR container
+        elements.qrCodeContainer.innerHTML = `
+            <div class="error-state" style="text-align: center; padding: 20px; color: #ef4444;">
+                <p><strong>Connection Error</strong></p>
+                <p style="font-size: 0.9em">${err.type}</p>
+                <button onclick="initPeer()" style="margin-top: 10px; padding: 5px 10px; cursor: pointer;">Retry</button>
+            </div>
+        `;
+
         // Retry after a delay
-        setTimeout(initPeer, 3000);
+        // setTimeout(initPeer, 3000); // Disable auto-retry to let user see error
     });
 
     state.peer.on('disconnected', () => {
