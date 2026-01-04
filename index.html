@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prompt Saver - Web Companion</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+
+<body>
+    <div id="app">
+        <!-- Connection Screen -->
+        <div id="connection-screen" class="screen active">
+            <div class="connection-card connection-card-large">
+                <div class="logo">
+                    <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect width="64" height="64" rx="16" fill="url(#gradient)" />
+                        <path d="M20 20h24v4H20zM20 28h20v4H20zM20 36h24v4H20zM20 44h16v4H20z" fill="white" />
+                        <defs>
+                            <linearGradient id="gradient" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+                                <stop stop-color="#6366F1" />
+                                <stop offset="1" stop-color="#8B5CF6" />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+                <h1 data-i18n="app_name">Prompt Saver</h1>
+                <p class="subtitle" data-i18n="scan_with_phone">Scan this QR code with the Prompt Saver app on your
+                    phone</p>
+
+                <div class="qr-display-section">
+                    <div id="qr-code-container" class="qr-code-container">
+                        <div class="qr-loading">
+                            <div class="spinner"></div>
+                            <p data-i18n="generating_qr">Generating QR Code...</p>
+                        </div>
+                    </div>
+                    <button id="refresh-qr-btn" class="btn-outline">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16" />
+                        </svg>
+                        <span data-i18n="refresh_qr">Refresh QR Code</span>
+                    </button>
+                </div>
+
+                <div class="instructions">
+                    <h3 data-i18n="how_to_connect">How to connect:</h3>
+                    <ol>
+                        <li data-i18n="step_1">Open Prompt Saver app on your phone</li>
+                        <li data-i18n="step_2">Tap "QR Sync" in settings or home</li>
+                        <li data-i18n="step_3">Scan this QR code</li>
+                    </ol>
+                </div>
+
+                <div id="connection-status" class="connection-status">
+                    <div class="status-indicator waiting"></div>
+                    <span data-i18n="waiting_for_scan">Waiting for scan...</span>
+                </div>
+
+                <p class="privacy-note">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                    </svg>
+                    <span data-i18n="privacy_note">All data stays on your device. This session is temporary.</span>
+                </p>
+            </div>
+        </div>
+
+        <!-- Main Screen -->
+        <div id="main-screen" class="screen hidden">
+            <header class="app-header">
+                <div class="header-left">
+                    <h1 data-i18n="app_name">Prompt Saver</h1>
+                </div>
+                <div class="header-right">
+                    <div class="session-info">
+                        <div class="status-indicator connected"></div>
+                        <span data-i18n="session_duration">Session</span>
+                        <span id="session-timer" class="session-timer">0:00</span>
+                    </div>
+
+                    <button id="add-prompt-btn" class="btn-primary btn-sm">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19" />
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                        </svg>
+                        <span data-i18n="add_prompt">Add Prompt</span>
+                    </button>
+
+                    <div class="dropdown">
+                        <button id="more-actions-btn" class="btn-outline btn-sm">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <circle cx="12" cy="12" r="1" />
+                                <circle cx="19" cy="12" r="1" />
+                                <circle cx="5" cy="12" r="1" />
+                            </svg>
+                        </button>
+                        <div id="actions-dropdown" class="dropdown-menu hidden">
+                            <button id="export-btn" class="dropdown-item">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                    <polyline points="7 10 12 15 17 10" />
+                                    <line x1="12" y1="15" x2="12" y2="3" />
+                                </svg>
+                                <span data-i18n="export">Export</span>
+                            </button>
+                            <button id="import-btn" class="dropdown-item">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                    <polyline points="17 8 12 3 7 8" />
+                                    <line x1="12" y1="3" x2="12" y2="15" />
+                                </svg>
+                                <span data-i18n="import">Import</span>
+                            </button>
+                        </div>
+                    </div>
+                    <input type="file" id="import-file" accept=".json" class="hidden">
+
+                    <button id="disconnect-btn" class="btn-outline btn-sm btn-danger-outline"
+                        data-i18n="stop_session">Disconnect</button>
+
+                    <div class="language-selector">
+                        <select id="language-select">
+                            <option value="en">English</option>
+                            <option value="ar">العربية</option>
+                            <option value="fr">Français</option>
+                            <option value="es">Español</option>
+                        </select>
+                    </div>
+                    <button id="theme-toggle" class="icon-btn" aria-label="Toggle theme">
+                        <svg class="sun-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="5" />
+                            <path
+                                d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+                        </svg>
+                        <svg class="moon-icon hidden" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                        </svg>
+                    </button>
+                </div>
+            </header>
+
+            <main class="main-content">
+                <aside class="sidebar">
+                    <div class="search-box">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <circle cx="11" cy="11" r="8" />
+                            <path d="m21 21-4.35-4.35" />
+                        </svg>
+                        <input type="text" id="search-input" data-i18n-placeholder="search">
+                    </div>
+
+                    <nav class="categories-nav">
+                        <div class="categories-header">
+                            <h3 data-i18n="categories">Categories</h3>
+                            <button id="add-category-btn" class="icon-btn-sm" title="Add Category">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19" />
+                                    <line x1="5" y1="12" x2="19" y2="12" />
+                                </svg>
+                            </button>
+                        </div>
+                        <ul id="categories-list">
+                            <li class="category-item active" data-category="all">
+                                <span class="category-dot"></span>
+                                <span data-i18n="all_categories">All Categories</span>
+                                <span class="count" id="all-count">0</span>
+                            </li>
+                        </ul>
+                    </nav>
+                </aside>
+
+                <section class="prompts-section">
+                    <div class="section-header">
+                        <h2 data-i18n="prompts">Prompts</h2>
+                        <div class="view-controls">
+                            <select id="sort-select">
+                                <option value="date_created" data-i18n="date_created">Date Created</option>
+                                <option value="last_used" data-i18n="last_used">Last Used</option>
+                                <option value="usage_count" data-i18n="usage_count">Usage Count</option>
+                                <option value="rating" data-i18n="rating">Rating</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="prompts-grid" class="prompts-grid"></div>
+
+                    <div id="empty-state" class="empty-state hidden">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1.5">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                            <line x1="16" y1="13" x2="8" y2="13" />
+                            <line x1="16" y1="17" x2="8" y2="17" />
+                        </svg>
+                        <h3 data-i18n="no_prompts">No prompts yet</h3>
+                        <button id="empty-add-btn" class="btn-primary" style="margin-top: 16px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19" />
+                                <line x1="5" y1="12" x2="19" y2="12" />
+                            </svg>
+                            <span data-i18n="add_first_prompt">Add Your First Prompt</span>
+                        </button>
+                    </div>
+                </section>
+            </main>
+        </div>
+
+        <!-- View Prompt Modal -->
+        <div id="prompt-modal" class="modal hidden">
+            <div class="modal-overlay"></div>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="modal-title"></h2>
+                    <button class="modal-close" id="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="prompt-meta">
+                        <span class="category-badge" id="modal-category"></span>
+                        <div class="rating" id="modal-rating"></div>
+                    </div>
+                    <div class="prompt-content-wrapper">
+                        <pre id="modal-content" class="prompt-content"></pre>
+                        <button id="copy-btn" class="copy-btn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                            </svg>
+                            <span data-i18n="copy">Copy</span>
+                        </button>
+                    </div>
+                    <div id="modal-notes" class="prompt-notes hidden">
+                        <h4 data-i18n="notes">Notes</h4>
+                        <p id="notes-content"></p>
+                    </div>
+                    <div class="prompt-tags" id="modal-tags"></div>
+                </div>
+                <div class="modal-footer">
+                    <div class="prompt-stats">
+                        <span><strong data-i18n="usage_count">Uses</strong>: <span id="modal-copies">0</span></span>
+                        <span><strong data-i18n="date_created">Created</strong>: <span id="modal-created"></span></span>
+                    </div>
+                    <div class="modal-actions">
+                        <button id="edit-prompt-btn" class="btn-outline btn-sm">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                            </svg>
+                            <span data-i18n="edit">Edit</span>
+                        </button>
+                        <button id="delete-prompt-btn" class="btn-danger btn-sm">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polyline points="3 6 5 6 21 6" />
+                                <path
+                                    d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                            </svg>
+                            <span data-i18n="delete">Delete</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add/Edit Prompt Modal -->
+        <div id="add-prompt-modal" class="modal hidden">
+            <div class="modal-overlay"></div>
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h2 id="add-modal-title" data-i18n="add_prompt">Add New Prompt</h2>
+                    <button class="modal-close" id="add-modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="prompt-form">
+                        <div class="form-group">
+                            <label for="prompt-title" data-i18n="title">Title</label>
+                            <input type="text" id="prompt-title" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="prompt-content-input" data-i18n="content">Content</label>
+                            <textarea id="prompt-content-input" rows="8" required></textarea>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="prompt-category" data-i18n="categories">Category</label>
+                                <select id="prompt-category"></select>
+                            </div>
+
+                            <div class="form-group">
+                                <label data-i18n="rating">Rating</label>
+                                <div class="star-rating" id="star-rating">
+                                    <span class="star" data-value="1">☆</span>
+                                    <span class="star" data-value="2">☆</span>
+                                    <span class="star" data-value="3">☆</span>
+                                    <span class="star" data-value="4">☆</span>
+                                    <span class="star" data-value="5">☆</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="prompt-notes" data-i18n="notes">Notes (optional)</label>
+                            <textarea id="prompt-notes" rows="2"></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="prompt-tags" data-i18n="tags">Tags (comma separated)</label>
+                            <input type="text" id="prompt-tags">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" id="cancel-prompt-btn" class="btn-outline" data-i18n="cancel">Cancel</button>
+                    <button type="submit" id="save-prompt-btn" class="btn-primary" data-i18n="save">Save Prompt</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Category Modal -->
+        <div id="category-modal" class="modal hidden">
+            <div class="modal-overlay"></div>
+            <div class="modal-content modal-small">
+                <div class="modal-header">
+                    <h2 id="category-modal-title" data-i18n="add_category">Add Category</h2>
+                    <button class="modal-close" id="category-modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="category-name" data-i18n="category_name">Category Name</label>
+                        <input type="text" id="category-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="category-color" data-i18n="color">Color</label>
+                        <div class="color-picker-wrapper">
+                            <input type="color" id="category-color" value="#6366F1">
+                            <span class="color-preview" id="color-preview">#6366F1</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" id="cancel-category-btn" class="btn-outline"
+                        data-i18n="cancel">Cancel</button>
+                    <button type="submit" id="save-category-btn" class="btn-primary" data-i18n="save">Save</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Notification -->
+        <div id="toast" class="toast hidden">
+            <span id="toast-message"></span>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
