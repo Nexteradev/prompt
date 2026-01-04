@@ -215,24 +215,30 @@ function initPeer() {
         debug: 2
     });
 
+    logToConsole('Peer created. Waiting for ID...');
+
     state.peer.on('open', (id) => {
         console.log('My peer ID is: ' + id);
+        logToConsole('Peer ID generated: ' + id);
         generateQRCode(id);
     });
 
     state.peer.on('connection', (conn) => {
         console.log('Incoming connection from: ' + conn.peer);
+        logToConsole('Incoming connection from: ' + conn.peer);
         state.conn = conn;
 
         updateConnectionStatus('connecting');
 
         conn.on('data', (data) => {
             console.log('Received data', data);
+            logToConsole('Received data: ' + JSON.stringify(data).substring(0, 50) + '...');
             handleConnection(data);
         });
 
         conn.on('open', () => {
             console.log('Connection opened');
+            logToConsole('Connection OPENED!');
             // Optional: Send a welcome message or ack
             conn.send({ status: 'connected' });
         });
@@ -244,6 +250,7 @@ function initPeer() {
 
         conn.on('error', (err) => {
             console.error('Connection error:', err);
+            logToConsole('Connection Error: ' + err);
             showToast('Connection error: ' + err, 'error');
             updateConnectionStatus('error');
         });
@@ -251,6 +258,7 @@ function initPeer() {
 
     state.peer.on('error', (err) => {
         console.error('Peer error:', err);
+        logToConsole('Peer Error: ' + err.type);
         showToast('Server error: ' + err.type, 'error');
 
         // Show error in QR container
@@ -268,8 +276,24 @@ function initPeer() {
 
     state.peer.on('disconnected', () => {
         console.log('Peer disconnected from server');
+        logToConsole('Peer disconnected from server');
         // state.peer.reconnect();
     });
+}
+
+function logToConsole(msg) {
+    const consoleEl = document.getElementById('debug-console');
+    const logsEl = document.getElementById('debug-logs');
+    if (consoleEl && logsEl) {
+        consoleEl.style.display = 'block';
+        const time = new Date().toLocaleTimeString();
+        const logItem = document.createElement('div');
+        logItem.style.borderBottom = '1px solid #334155';
+        logItem.style.padding = '2px 0';
+        logItem.textContent = `[${time}] ${msg}`;
+        logsEl.appendChild(logItem);
+        consoleEl.scrollTop = consoleEl.scrollHeight;
+    }
 }
 
 function generateQRCode(peerId) {
