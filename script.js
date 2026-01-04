@@ -20,7 +20,9 @@ const state = {
     pollingInterval: null,
     editingPromptId: null,
     editingCategoryId: null,
-    selectedRating: 3
+    selectedRating: 3,
+    peer: null,
+    conn: null
 };
 
 // DOM Elements
@@ -96,49 +98,22 @@ async function init() {
 
     setTheme(savedTheme);
     await setLocale(savedLocale);
-    
+
     // Check for data in URL hash first
-    checkUrlForData();
-    
+    // Initialize PeerJS instead of checking URL hash
+    initPeer();
+
     generateQRCode();
     setupEventListeners();
 }
 
+// Old URL hash check removed in favor of PeerJS
 function checkUrlForData() {
-    // Check if data is passed via URL hash
-    const hash = window.location.hash;
-    if (hash && hash.startsWith('#data=')) {
-        try {
-            const encodedData = hash.substring(6);
-            const jsonData = decodeURIComponent(atob(encodedData));
-            const data = JSON.parse(jsonData);
-            
-            if (data && data.prompts) {
-                handleConnection(data);
-                // Clear the hash after reading
-                history.replaceState(null, null, window.location.pathname);
-            }
-        } catch (e) {
-            console.error('Failed to parse URL data:', e);
-        }
-    }
-    
-    // Also check localStorage for cached session
-    const cachedData = localStorage.getItem('prompt_master_session');
-    if (cachedData && !state.connected) {
-        try {
-            const data = JSON.parse(cachedData);
-            if (data && data.prompts) {
-                handleConnection(data);
-            }
-        } catch (e) {
-            localStorage.removeItem('prompt_master_session');
-        }
-    }
+    // Legacy support or fallback if needed, but primarily using PeerJS now
 }
 
 function setupEventListeners() {
-    elements.refreshQrBtn.addEventListener('click', generateQRCode);
+    elements.refreshQrBtn.addEventListener('click', initPeer);
     elements.disconnectBtn.addEventListener('click', disconnect);
     elements.themeToggle.addEventListener('click', toggleTheme);
     elements.languageSelect.addEventListener('change', (e) => setLocale(e.target.value));
@@ -203,9 +178,9 @@ function setupEventListeners() {
             closeCategoryModal();
         }
     });
-    
+
     // Listen for hash changes (when app sends data)
-    window.addEventListener('hashchange', checkUrlForData);
+    // window.addEventListener('hashchange', checkUrlForData);
 }
 
 // ========================================
@@ -221,16 +196,78 @@ function generateSessionId() {
     return result;
 }
 
-function generateQRCode() {
-    state.sessionId = generateSessionId();
-    
-    // Include the current page URL so the app knows where to redirect
-    const pageUrl = window.location.href.split('#')[0];
-    
+function initPeer() {
+    if (state.peer) {
+        state.peer.destroy();
+    }
+
+    updateConnectionStatus('waiting');
+    elements.qrCodeContainer.innerHTML = `
+        <div class="qr-loading">
+            <div class="spinner"></div>
+            <p>${state.translations.generating_qr || 'Generating QR Code...'}</p>
+        </div>
+    `;
+
+    // Create a new Peer
+    // We use the default PeerJS cloud server (0.peerjs.com)
+    state.peer = new Peer(null, {
+        debug: 2
+    });
+
+    state.peer.on('open', (id) => {
+        console.log('My peer ID is: ' + id);
+        generateQRCode(id);
+    });
+
+    state.peer.on('connection', (conn) => {
+        console.log('Incoming connection from: ' + conn.peer);
+        state.conn = conn;
+
+        updateConnectionStatus('connecting');
+
+        conn.on('data', (data) => {
+            console.log('Received data', data);
+            handleConnection(data);
+        });
+
+        conn.on('open', () => {
+            console.log('Connection opened');
+            // Optional: Send a welcome message or ack
+            conn.send({ status: 'connected' });
+        });
+
+        conn.on('close', () => {
+            console.log('Connection closed');
+            // Handle disconnection if needed
+        });
+
+        conn.on('error', (err) => {
+            console.error('Connection error:', err);
+            showToast('Connection error', 'error');
+        });
+    });
+
+    state.peer.on('error', (err) => {
+        console.error('Peer error:', err);
+        showToast('Connection server error. Retrying...', 'error');
+        // Retry after a delay
+        setTimeout(initPeer, 3000);
+    });
+
+    state.peer.on('disconnected', () => {
+        console.log('Peer disconnected from server');
+        // state.peer.reconnect();
+    });
+}
+
+function generateQRCode(peerId) {
+    state.sessionId = peerId;
+
+    // QR data now contains the Peer ID and type 'peerjs'
     const qrData = JSON.stringify({
-        type: 'prompt_master_web',
-        sessionId: state.sessionId,
-        url: pageUrl,
+        type: 'peerjs',
+        peerId: peerId,
         timestamp: Date.now()
     });
 
@@ -298,7 +335,7 @@ function handleConnection(data) {
             state.prompts = data.prompts;
             state.categories = data.categories || [];
             state.tags = data.tags || [];
-            
+
             // Cache the session data
             localStorage.setItem('prompt_master_session', JSON.stringify(data));
         } else {
@@ -325,14 +362,14 @@ function handleConnection(data) {
 }
 
 // Function for app to call - receives data and displays it
-window.receiveDataFromApp = function(data) {
+window.receiveDataFromApp = function (data) {
     if (data && data.prompts) {
         handleConnection(data);
     }
 };
 
 // Demo function for testing
-window.simulatePhoneScan = function() {
+window.simulatePhoneScan = function () {
     loadDemoData();
     handleConnection({ prompts: state.prompts, categories: state.categories, tags: state.tags });
 };
@@ -378,7 +415,16 @@ function disconnect() {
     state.sessionStartTime = null;
     state.prompts = [];
     state.categories = [];
-    
+
+    if (state.peer) {
+        state.peer.destroy();
+        state.peer = null;
+    }
+    if (state.conn) {
+        state.conn.close();
+        state.conn = null;
+    }
+
     // Clear cached session
     localStorage.removeItem('prompt_master_session');
 
@@ -390,7 +436,7 @@ function disconnect() {
         elements.connectionScreen.classList.remove('hidden', 'fade-out');
         elements.connectionScreen.classList.add('active', 'fade-in');
 
-        generateQRCode();
+        initPeer();
 
         setTimeout(() => {
             elements.connectionScreen.classList.remove('fade-in');
